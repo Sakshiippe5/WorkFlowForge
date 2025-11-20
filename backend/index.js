@@ -1,85 +1,87 @@
+// backend/index.js
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
-const jwt = require('jsonwebtoken');
+const cors = require('cors');
 const bcrypt = require('bcryptjs');
-require('dotenv').config(); // Load environment variables
+const jwt = require('jsonwebtoken');
+const { PrismaClient } = require('@prisma/client');
+require('dotenv').config();
 
 const app = express();
-const port = 5000;
+const prisma = new PrismaClient();
 
+app.use(cors());
 app.use(express.json());
 
-const prisma = new PrismaClient();
-const SECRET_KEY = process.env.SECRET_KEY; // Get from .env
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+// ROOT ROUTE
+app.get('/', (req, res) => {
+  res.json({ message: 'WorkFlowForge Backend is LIVE!' });
 });
 
-// Simulated user signup (for testing)
+// SIGNUP - FIXED WITH PROPER AWAIT
 app.post('/signup', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, name } = req.body;
+
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({
-      data: { email, password: hashedPassword },
+    // Check if user exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
     });
-    res.status(201).json({ message: 'User created', userId: user.id });
-  } catch (error) {
-    if (error.code === 'P2002') { // Unique constraint violation (e.g., duplicate email)
-      res.status(400).json({ message: 'Email already exists' });
-    } else {
-      res.status(500).json({ message: 'Server error' });
+
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
     }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        name: name || null
+      }
+    });
+
+    res.status(201).json({ message: 'User created successfully!' });
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
-// Simulated user login
+// LOGIN - ALSO FIXED
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
+
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
-    const token = jwt.sign({ userId: user.id }, SECRET_KEY, { expiresIn: '1h' });
-    res.json({ token });
+
+    const isValid = await bcrypt.compare(password, user.password);
+    if (!isValid) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.SECRET_KEY || 'fallback-secret-key',
+      { expiresIn: '24h' }
+    );
+
+    res.json({ token, message: 'Login successful!' });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Protected route (requires token)
-app.get('/dashboard', async (req, res) => {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'No token provided' });
-  }
-  const token = authHeader.split(' ')[1]; // Extract token after 'Bearer '
-  try {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
-    if (!user) throw new Error('User not found');
-    res.json({ message: `Welcome, ${user.email}!` });
-  } catch (error) {
-    res.status(401).json({ message: 'Invalid token' });
-  }
-});
-
-// Start server
-app.listen(port, () => {
-  console.log(`Backend running on http://localhost:${port}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
+const PORT = 5000;
+app.listen(PORT, () => {
+  console.log(`Backend running on http://localhost:${PORT}`);
 });

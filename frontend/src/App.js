@@ -1,6 +1,7 @@
 // src/App.js
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -12,20 +13,21 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
 
+        {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/specs" element={<Specs />} />
           <Route path="/reports" element={<Reports />} />
         </Route>
       </Routes>
-    </>
+    </AuthProvider>
   );
 }
 

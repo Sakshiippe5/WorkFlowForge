@@ -16,6 +16,7 @@ datasource db {
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
-  name      String?
+  password  String
+  name      String?  // ← THIS LINE WAS MISSING
   createdAt DateTime @default(now())
 }

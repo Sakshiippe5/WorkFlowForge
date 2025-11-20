@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
-export function Login() {
+function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -14,29 +14,35 @@ export function Login() {
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
+  e.preventDefault();
+  setLoading(true);
+  setMessage('');
 
-    try {
-      const response = await axios.post(
-        'http://localhost:5000/login',
-        { email, password },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+  try {
+    const response = await axios.post('http://localhost:5000/login', {
+      email,
+      password
+    });
 
-      const token = response.data.token;
-      localStorage.setItem('token', `Bearer ${token}`);
-      login(token);
+    const token = response.data.token;
 
-      setMessage('Login successful! Redirecting...');
-      setTimeout(() => navigate('/dashboard'), 800);
-    } catch (error) {
-      setMessage('Login failed: ' + (error.response?.data?.message || 'Network error'));
-    } finally {
-      setLoading(false);
-    }
-  };
+    // THIS IS THE KEY: Save token + update auth context
+    localStorage.setItem('token', `Bearer ${token}`);
+    login(token);  // ← This comes from useAuth() – MUST call this!
+
+    setMessage('Login successful! Redirecting...');
+    
+    // Redirect to dashboard
+    setTimeout(() => {
+      navigate('/dashboard');
+    }, 1000);
+
+  } catch (error) {
+    setMessage(error.response?.data?.message || 'Login failed');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 flex items-center justify-center p-6 relative overflow-hidden">
